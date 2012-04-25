@@ -14,13 +14,13 @@ module Geocoder::Store
       base.extend ClassMethods
       base.class_eval do
 
-        # scope: geocoded objects
-        scope :geocoded, lambda {
+        # named_scope: geocoded objects
+        named_scope :geocoded, lambda {
           {:conditions => "#{geocoder_options[:latitude]} IS NOT NULL " +
             "AND #{geocoder_options[:longitude]} IS NOT NULL"}}
 
-        # scope: not-geocoded objects
-        scope :not_geocoded, lambda {
+        # named_scope: not-geocoded objects
+        named_scope :not_geocoded, lambda {
           {:conditions => "#{geocoder_options[:latitude]} IS NULL " +
             "OR #{geocoder_options[:longitude]} IS NULL"}}
 
@@ -28,13 +28,13 @@ module Geocoder::Store
         # Find all objects within a radius of the given location.
         # Location may be either a string to geocode or an array of
         # coordinates (<tt>[lat,lon]</tt>). Also takes an options hash
-        # (see Geocoder::Orm::ActiveRecord::ClassMethods.near_scope_options
+        # (see Geocoder::Orm::ActiveRecord::ClassMethods.near_named_scope_options
         # for details).
         #
-        scope :near, lambda{ |location, *args|
+        named_scope :near, lambda{ |location, *args|
           latitude, longitude = Geocoder::Calculations.extract_coordinates(location)
           if latitude and longitude
-            near_scope_options(latitude, longitude, *args)
+            near_named_scope_options(latitude, longitude, *args)
           else
             where(false_condition) # no results if no lat/lon given
           end
@@ -47,7 +47,7 @@ module Geocoder::Store
         # corner followed by the northeast corner of the box
         # (<tt>[[sw_lat, sw_lon], [ne_lat, ne_lon]]</tt>).
         #
-        scope :within_bounding_box, lambda{ |bounds|
+        named_scope :within_bounding_box, lambda{ |bounds|
           sw_lat, sw_lng, ne_lat, ne_lng = bounds.flatten if bounds
           return where(false_condition) unless sw_lat && sw_lng && ne_lat && ne_lng
           spans = "#{geocoder_options[:latitude]} BETWEEN #{sw_lat} AND #{ne_lat} AND "
@@ -89,11 +89,11 @@ module Geocoder::Store
       # * +:order+   - column(s) for ORDER BY SQL clause; default is distance
       # * +:exclude+ - an object to exclude (used by the +nearbys+ method)
       #
-      def near_scope_options(latitude, longitude, radius = 20, options = {})
+      def near_named_scope_options(latitude, longitude, radius = 20, options = {})
         if using_sqlite?
-          approx_near_scope_options(latitude, longitude, radius, options)
+          approx_near_named_scope_options(latitude, longitude, radius, options)
         else
-          full_near_scope_options(latitude, longitude, radius, options)
+          full_near_named_scope_options(latitude, longitude, radius, options)
         end
       end
 
@@ -113,7 +113,7 @@ module Geocoder::Store
       # Bearing calculation based on:
       # http://www.beginningspatial.com/calculating_bearing_one_point_another
       #
-      def full_near_scope_options(latitude, longitude, radius, options)
+      def full_near_named_scope_options(latitude, longitude, radius, options)
         lat_attr = geocoder_options[:latitude]
         lon_attr = geocoder_options[:longitude]
         options[:bearing] = :linear unless options.include?(:bearing)
@@ -141,7 +141,7 @@ module Geocoder::Store
 
         distance = full_distance_from_sql(latitude, longitude, options)
         conditions = ["#{distance} <= ?", radius]
-        default_near_scope_options(latitude, longitude, radius, options).merge(
+        default_near_named_scope_options(latitude, longitude, radius, options).merge(
           :select => "#{options[:select] || full_column_name("*")}, " +
             "#{distance} AS distance" +
             (bearing ? ", #{bearing} AS bearing" : ""),
@@ -188,7 +188,7 @@ module Geocoder::Store
       # Distance and bearing calculations are *extremely inaccurate*. They
       # only exist for interface consistency--not intended for production!
       #
-      def approx_near_scope_options(latitude, longitude, radius, options)
+      def approx_near_named_scope_options(latitude, longitude, radius, options)
         lat_attr = geocoder_options[:latitude]
         lon_attr = geocoder_options[:longitude]
         options[:bearing] = :linear unless options.include?(:bearing)
@@ -210,7 +210,7 @@ module Geocoder::Store
           "#{lat_attr} BETWEEN ? AND ? AND #{lon_attr} BETWEEN ? AND ?"] +
           [b[0], b[2], b[1], b[3]
         ]
-        default_near_scope_options(latitude, longitude, radius, options).merge(
+        default_near_named_scope_options(latitude, longitude, radius, options).merge(
           :select => "#{options[:select] || full_column_name("*")}, " +
             "#{distance} AS distance" +
             (bearing ? ", #{bearing} AS bearing" : ""),
@@ -219,9 +219,9 @@ module Geocoder::Store
       end
 
       ##
-      # Options used for any near-like scope.
+      # Options used for any near-like named_scope.
       #
-      def default_near_scope_options(latitude, longitude, radius, options)
+      def default_near_named_scope_options(latitude, longitude, radius, options)
         {
           :order  => options[:order] || "distance",
           :limit  => options[:limit],
